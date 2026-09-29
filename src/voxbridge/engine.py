@@ -134,7 +134,10 @@ class RvcEngine:
                     import faiss
                 except ImportError as exc:
                     raise RuntimeError("FAISS is required when index_rate > 0; install faiss-cpu") from exc
-                self._index = faiss.read_index(str(self.index_path))
+                # FAISS's Windows narrow-character fopen rejects Chinese paths.
+                # Let Python open the file, while streaming into FAISS's reader.
+                with self.index_path.open("rb") as index_file:
+                    self._index = faiss.read_index(faiss.PyCallbackIOReader(index_file.read))
                 if self._index.ntotal < 8:
                     raise ValueError("Index contains too few vectors; select an added_*.index")
                 self._index_vectors = self._index.reconstruct_n(0, self._index.ntotal)
@@ -263,3 +266,8 @@ class RvcEngine:
             if hasattr(self, name):
                 delattr(self, name)
         self.runtime_info["loaded"] = False
+        # Return cached GPU allocations when the user stops voice conversion.
+        # This matters when the same GPU is subsequently used by a game.
+        torch = getattr(self, "_torch", None)
+        if torch is not None and self.device_name == "cuda" and torch.cuda.is_available():
+            torch.cuda.empty_cache()

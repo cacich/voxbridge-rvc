@@ -46,13 +46,13 @@ def test_exported_model_full_inference(tmp_path: Path, version: str, has_f0: int
 
     # Cover retrieval in one F0 and one non-F0 case, without a user's voice data.
     use_index = (version == "v1" and has_f0) or (version == "v2" and not has_f0)
-    index_path = tmp_path / "test.index"
+    index_path = tmp_path / "聲線檢索.index"
     if use_index:
         import faiss
         dimensions = 256 if version == "v1" else 768
         index = faiss.IndexFlatL2(dimensions)
         index.add(np.random.default_rng(7).standard_normal((16, dimensions)).astype(np.float32))
-        faiss.write_index(index, str(index_path))
+        faiss.serialize_index(index).tofile(index_path)
 
     engine = RvcEngine(dict(model_path=str(checkpoint), index_path=str(index_path) if use_index else "", assets_dir=assets,
                             pitch=0, index_rate=0.5 if use_index else 0.0, device="cpu", block_ms=100, sample_rate=48000))
