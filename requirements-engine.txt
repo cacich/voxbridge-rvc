@@ -1,0 +1,11 @@
+# Windows 11, Python 3.12 x64. Install the NVIDIA PyTorch build first:
+# python -m pip install torch==2.7.1+cu118 --index-url https://download.pytorch.org/whl/cu118
+# Then: python -m pip install -r requirements-engine.txt
+# CPU users can explicitly install torch==2.7.1 from the CPU wheel index and
+# select device=cpu in VoxBridge. PyTorch is intentionally installed separately
+# so pip cannot silently replace a CUDA build with a CPU wheel.
+numpy>=1.26.4,<2
+scipy>=1.13.1,<2
+librosa>=0.10.2,<0.11
+transformers>=4.49.0,<4.50
+faiss-cpu>=1.13.0,<2

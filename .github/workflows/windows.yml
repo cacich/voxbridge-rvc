@@ -1,0 +1,58 @@
+name: Windows
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install application and test tools
+        run: python -m pip install -e ".[dev]" -c constraints-windows.txt
+      - name: Compile Python source
+        run: python -m compileall -q src
+      - name: Run core tests
+        run: python -m pytest -q -m "not gpu"
+
+  package:
+    if: github.event_name != 'pull_request'
+    needs: checks
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Report free disk space
+        shell: pwsh
+        run: |
+          $disk = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
+          $freeGb = [math]::Round($disk.FreeSpace / 1GB, 1)
+          Write-Host "Free space before CUDA build: $freeGb GB"
+          if ($freeGb -lt 10) { throw 'Less than 10 GB free; CUDA packaging needs more space.' }
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build portable app and installer
+        shell: pwsh
+        run: ./scripts/build-windows.ps1 -SkipTests
+      - name: Upload Windows packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoxBridge-0.1.0-beta-win64
+          path: |
+            dist/VoxBridge-0.1.0-beta-win64-setup.exe
+            dist/VoxBridge-0.1.0-beta-win64-portable.zip
+            dist/build-info.txt
+            dist/engine-check.json
+          if-no-files-found: error
+          retention-days: 14
