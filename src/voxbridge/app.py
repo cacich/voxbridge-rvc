@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QObject, QThread, QTimer, Qt, Signal, Slot
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSlider,
+    QTabWidget,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -70,8 +71,9 @@ class VoxBridgeWindow(QMainWindow):
         icon_path = Path(__file__).resolve().parent / "resources" / "voxbridge.ico"
         if icon_path.is_file():
             self.setWindowIcon(QIcon(str(icon_path)))
-        self.resize(900, 820)
-        self.setMinimumSize(740, 650)
+        self.resize(1120, 860)
+        self.setMinimumSize(900, 650)
+        self.setFont(QFont("Microsoft JhengHei UI", 10))
         self._smoke_test = smoke_test
         self._closing = False
         self._download_thread: QThread | None = None
@@ -120,30 +122,74 @@ class VoxBridgeWindow(QMainWindow):
     def _build_ui(self) -> None:
         self.setStyleSheet(
             """
-            QMainWindow, QScrollArea, QWidget#page, QWidget#root { background: #101722; color: #eaf0f7; }
-            QFrame#footer { background: #172435; border-top: 1px solid #3d5368; }
-            QGroupBox { background: #192536; border: 1px solid #34465a; border-radius: 10px;
-                margin-top: 16px; padding: 16px 14px 12px; font-weight: 600; color: #eaf0f7; }
-            QGroupBox::title { subcontrol-origin: margin; left: 14px; padding: 0 5px; }
-            QLabel { color: #eaf0f7; }
-            QLabel#muted { color: #a9bdce; }
-            QLabel#notice { background: #253447; border-radius: 6px; padding: 9px; }
-            QLineEdit, QComboBox, QSpinBox { background: #101b29; color: #f4f8fd;
-                border: 1px solid #4c6276; border-radius: 6px; padding: 6px; min-height: 23px; }
-            QComboBox QAbstractItemView { background: #192536; color: #eaf0f7; selection-background-color: #315f8d; }
-            QPushButton { background: #315f8d; color: #fff; border: 1px solid #4a7fad;
-                border-radius: 6px; padding: 7px 14px; font-weight: 600; }
-            QPushButton:hover { background: #3d729f; }
-            QPushButton:disabled { background: #344457; color: #899aaa; border-color: #46586a; }
-            QPushButton#start { background: #187a68; border-color: #31a68d; }
-            QPushButton#stop { background: #9a493f; border-color: #c46a5d; }
-            QProgressBar { background: #101b29; border: 1px solid #4c6276; border-radius: 5px;
-                color: #eaf0f7; min-height: 16px; text-align: center; }
-            QProgressBar::chunk { background: #35ad9b; border-radius: 4px; }
-            QCheckBox { spacing: 8px; color: #eaf0f7; }
-            QSlider::groove:horizontal { height: 6px; background: #42566a; border-radius: 3px; }
-            QSlider::handle:horizontal { width: 16px; margin: -5px 0; background: #64b4e5; border-radius: 8px; }
-            """
+            QWidget { font-family: "Microsoft JhengHei UI", "Segoe UI"; font-size: 13px; color: #263747; }
+            QMainWindow, QScrollArea, QWidget#page, QWidget#root { background: #f3f6f8; }
+            QScrollArea { border: none; }
+            QFrame#footer { background: #ffffff; border-top: 1px solid #dde5eb; }
+            QGroupBox { background: #ffffff; border: 1px solid #e0e7ec; border-radius: 14px;
+                margin-top: 0; padding: 46px 18px 18px; font-weight: 600; }
+            QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top left; left: 24px; top: 18px; padding: 0; color: #33495b; font-size: 14px; }
+            QLabel { background: transparent; }
+            QLabel#muted { color: #687d8d; font-size: 12px; }
+            QLabel#eyebrow { color: #65808c; font-size: 11px; font-weight: 600; }
+            QLabel#badge { background: #e5f3ef; color: #217466; border-radius: 10px; padding: 5px 12px; }
+            QLabel#state { background: #eef2f5; color: #586d7d; border-radius: 12px; padding: 8px 16px; }
+            QLabel#state[status="running"] { background: #def4eb; color: #126b51; }
+            QLabel#state[status="error"] { background: #fff0ed; color: #ac453b; }
+            QLabel#state[status="loading"], QLabel#state[status="stopping"] { background: #fff5de; color: #896018; }
+            QLineEdit, QComboBox, QSpinBox { background: #f8fafb; color: #263747;
+                border: 1px solid #dce5eb; border-radius: 8px; padding: 7px 10px; min-height: 24px;
+                selection-background-color: #d3eee6; selection-color: #175c50; }
+            QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border: 1px solid #36a28b; background: #ffffff; }
+            QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled { color: #8796a1; background: #f1f4f6; }
+            QComboBox::drop-down { border: none; width: 28px; }
+            QComboBox::down-arrow { image: url("DOWN_ICON"); width: 14px; height: 14px; }
+            QSpinBox::up-button { subcontrol-origin: border; subcontrol-position: top right;
+                width: 28px; border: none; background: transparent; }
+            QSpinBox::down-button { subcontrol-origin: border; subcontrol-position: bottom right;
+                width: 28px; border: none; background: transparent; }
+            QSpinBox::up-arrow { image: url("UP_ICON"); width: 12px; height: 12px; }
+            QSpinBox::down-arrow { image: url("DOWN_ICON"); width: 12px; height: 12px; }
+            QComboBox QAbstractItemView { background: #ffffff; color: #263747; padding: 6px;
+                border: 1px solid #dce5eb; selection-background-color: #e5f3ef; selection-color: #175c50; }
+            QPushButton { background: #ffffff; color: #3a5364; border: 1px solid #dce5eb;
+                border-radius: 8px; padding: 8px 14px; font-weight: 600; min-height: 22px; }
+            QPushButton:hover { background: #edf7f3; border-color: #93caba; color: #176e5a; }
+            QPushButton:pressed { background: #dcefe8; }
+            QPushButton:focus { border-color: #168165; }
+            QPushButton:disabled { background: #f3f5f7; color: #a0aeb8; border-color: #e5ebef; }
+            QPushButton#start { background: #167a63; color: #ffffff; border: 1px solid #167a63;
+                border-radius: 10px; padding: 10px 28px; font-size: 14px; }
+            QPushButton#start:hover { background: #116550; }
+            QPushButton#start:disabled { background: #e0e9e5; border-color: #e0e9e5; color: #90a59c; }
+            QPushButton#stop { color: #9c5750; border-color: #ecdeda; padding: 10px 20px; }
+            QPushButton#stop:disabled { color: #b6aaa6; border-color: #eee8e5; }
+            QPushButton#voice { background: #ffffff; text-align: left; padding: 9px 15px; }
+            QProgressBar { background: #edf2f5; border: none; border-radius: 4px; min-height: 8px; max-height: 8px; }
+            QProgressBar::chunk { background: #38ae8d; border-radius: 4px; }
+            QCheckBox { spacing: 8px; }
+            QCheckBox::indicator { width: 16px; height: 16px; border-radius: 5px; border: 1px solid #b7c8d1; background: #ffffff; }
+            QCheckBox::indicator:checked { background: #167a63; border: 1px solid #167a63; image: url("CHECK_ICON"); }
+            QCheckBox::indicator:disabled { background: #e6ecef; border-color: #d4dde2; }
+            QSlider::groove:horizontal { height: 5px; background: #e4ecf0; border-radius: 2px; }
+            QSlider::sub-page:horizontal { background: #55aa94; border-radius: 2px; }
+            QSlider::handle:horizontal { width: 18px; height: 18px; margin: -7px 0; border: none;
+                image: url("KNOB_ICON"); background: transparent; }
+            QSlider::handle:horizontal:disabled { border-color: #b8c9c2; }
+            QTabWidget::pane { border: none; background: #f3f6f8; top: 10px; }
+            QTabBar::tab { background: transparent; color: #738593; padding: 12px 22px;
+                border-bottom: 2px solid transparent; font-size: 14px; }
+            QTabBar::tab:selected { color: #126c57; border-bottom: 2px solid #168165; font-weight: 600; }
+            QTabBar::tab:hover { color: #126c57; background: #eaf3ef; }
+            QScrollBar:vertical { background: transparent; width: 8px; margin: 4px 0; }
+            QScrollBar::handle:vertical { background: #cbd6dd; min-height: 35px; border-radius: 4px; }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+            QToolTip { background: #263747; color: #ffffff; border: none; padding: 6px; }
+            """.replace("CHECK_ICON", (Path(__file__).parent / "resources" / "check.svg").as_posix())
+            .replace("DOWN_ICON", (Path(__file__).parent / "resources" / "chevron-down.svg").as_posix())
+            .replace("UP_ICON", (Path(__file__).parent / "resources" / "chevron-up.svg").as_posix())
+            .replace("KNOB_ICON", (Path(__file__).parent / "resources" / "slider-knob.svg").as_posix())
         )
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -153,19 +199,34 @@ class VoxBridgeWindow(QMainWindow):
         layout.setContentsMargins(24, 20, 24, 22)
         layout.setSpacing(14)
 
+        header = QHBoxLayout()
+        brand_icon = QLabel()
+        brand_icon.setPixmap(self.windowIcon().pixmap(44, 44))
+        header.addWidget(brand_icon)
+        brand = QVBoxLayout()
         title = QLabel("VoxBridge")
-        title.setStyleSheet("font-size: 28px; font-weight: 700; color: #ffffff;")
-        subtitle = QLabel(f"RVC 即時變聲  ·  Windows 11  ·  {__version__} Beta")
+        title.setStyleSheet("font-size: 26px; font-weight: 700; color: #223747;")
+        subtitle = QLabel("你的聲音工作室  /  即時變聲")
         subtitle.setObjectName("muted")
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
+        brand.addWidget(title)
+        brand.addWidget(subtitle)
+        header.addLayout(brand)
+        header.addStretch(1)
+        self.voice_button = QPushButton("選擇你的聲線  →")
+        self.voice_button.setObjectName("voice")
+        self.voice_button.setMinimumWidth(220)
+        header.addWidget(self.voice_button)
+        badge = QLabel(f"{__version__}  BETA")
+        badge.setObjectName("badge")
+        header.addWidget(badge, alignment=Qt.AlignmentFlag.AlignVCenter)
+        layout.addLayout(header)
         self.notice_label = QLabel("")
         self.notice_label.setObjectName("notice")
         self.notice_label.setWordWrap(True)
         self.notice_label.hide()
         layout.addWidget(self.notice_label)
 
-        model = QGroupBox("1  聲線與必要檔案")
+        model = QGroupBox("聲線資料庫")
         mf = QFormLayout(model)
         self.model_edit = QLineEdit()
         self.model_edit.setPlaceholderText("選擇已訓練的 RVC .pth 模型")
@@ -188,8 +249,9 @@ class VoxBridgeWindow(QMainWindow):
         mf.addRow("", self._wrap(download_row))
         layout.addWidget(model)
 
-        audio = QGroupBox("2  音訊路由")
+        audio = QGroupBox("聲音連線")
         af = QFormLayout(audio)
+        af.setVerticalSpacing(14)
         self.output_mode_combo = QComboBox()
         self.output_mode_combo.addItem("Discord 虛擬麥克風", "discord")
         self.output_mode_combo.addItem("只在耳機測試變聲", "monitor_only")
@@ -213,7 +275,7 @@ class VoxBridgeWindow(QMainWindow):
         self.device_help.setObjectName("muted")
         self.device_help.setWordWrap(True)
         af.addRow("", self.device_help)
-        self.monitor_checkbox = QCheckBox("聽到自己的變聲（預設關閉）")
+        self.monitor_checkbox = QCheckBox("聽到自己的變聲")
         self.monitor_checkbox.setToolTip("只控制你聽到的聲音；Discord 的變聲輸出會繼續。建議使用耳機避免回授。")
         af.addRow("本機監聽", self.monitor_checkbox)
         self.monitor_slider, self.monitor_value = self._gain_controls()
@@ -226,8 +288,9 @@ class VoxBridgeWindow(QMainWindow):
         af.addRow("", self.route_help)
         layout.addWidget(audio)
 
-        tuning = QGroupBox("3  轉換設定")
+        tuning = QGroupBox("聲音調整")
         tf = QFormLayout(tuning)
+        tf.setVerticalSpacing(12)
         self.compute_combo = QComboBox()
         self.compute_combo.addItem("NVIDIA GPU（CUDA，建議）", "cuda")
         self.compute_combo.addItem("CPU（較慢）", "cpu")
@@ -247,11 +310,22 @@ class VoxBridgeWindow(QMainWindow):
         tf.addRow("處理區塊", self.block_combo)
         hint = QLabel("較小區塊通常較快，但可能增加卡頓；變更後需重新開始。")
         hint.setObjectName("muted")
+        hint.setWordWrap(True)
         tf.addRow("", hint)
         layout.addWidget(tuning)
 
-        run = QGroupBox("4  執行與狀態")
+        run = QGroupBox("即時訊號")
         rv = QVBoxLayout(run)
+        rv.setSpacing(14)
+        process_row = QHBoxLayout()
+        process_caption = QLabel("單次處理")
+        process_caption.setObjectName("muted")
+        process_row.addWidget(process_caption)
+        process_row.addStretch(1)
+        self.process_value = QLabel("— ms")
+        self.process_value.setStyleSheet("font-size: 26px; font-weight: 600; color: #176f59;")
+        process_row.addWidget(self.process_value)
+        rv.addLayout(process_row)
         meters = QGridLayout()
         self.input_meter = QProgressBar()
         self.output_meter = QProgressBar()
@@ -263,7 +337,7 @@ class VoxBridgeWindow(QMainWindow):
         meters.addWidget(QLabel("變聲輸出"), 1, 0)
         meters.addWidget(self.output_meter, 1, 1)
         rv.addLayout(meters)
-        self.metrics_label = QLabel("處理時間：— ms（僅引擎處理時間，非端到端延遲）")
+        self.metrics_label = QLabel("引擎處理時間，非端到端延遲\n開始變聲後，這裡會顯示訊號狀態。")
         self.metrics_label.setObjectName("muted")
         self.metrics_label.setWordWrap(True)
         rv.addWidget(self.metrics_label)
@@ -283,7 +357,47 @@ class VoxBridgeWindow(QMainWindow):
         help_text.setStyleSheet("line-height: 1.5;")
         hv.addWidget(help_text)
         layout.addWidget(help_box)
+        # Keep daily controls on one page, with setup and guidance one tab away.
+        for card in (model, audio, tuning, run, help_box):
+            layout.removeWidget(card)
+        self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
+        dashboard = QWidget()
+        dashboard_layout = QHBoxLayout(dashboard)
+        dashboard_layout.setContentsMargins(0, 10, 0, 14)
+        dashboard_layout.setSpacing(18)
+        dashboard_layout.addWidget(audio, 3)
+        right_column = QVBoxLayout()
+        right_column.setSpacing(14)
+        right_column.addWidget(tuning)
+        right_column.addWidget(run)
+        right_column.addStretch(1)
+        dashboard_layout.addLayout(right_column, 2)
+        dashboard_layout.setAlignment(audio, Qt.AlignmentFlag.AlignTop)
+        self.tabs.addTab(dashboard, "控制台")
+        for label, card, description in (
+            ("模型與引擎", model, "選擇你的 RVC 聲線。首次使用時，下載引擎檔案即可開始。"),
+            ("使用指南", help_box, "先在耳機確認變聲效果，再將聲音送進 Discord。"),
+        ):
+            tab = QWidget()
+            tab_layout = QVBoxLayout(tab)
+            tab_layout.setContentsMargins(0, 18, 0, 14)
+            intro = QLabel(description)
+            intro.setObjectName("muted")
+            intro.setWordWrap(True)
+            tab_layout.addWidget(intro)
+            tab_layout.addWidget(card)
+            tab_layout.addStretch(1)
+            self.tabs.addTab(tab, label)
+        layout.addWidget(self.tabs)
         layout.addStretch(1)
+        self.voice_button.clicked.connect(lambda: self.tabs.setCurrentIndex(1))
+        self.model_edit.textChanged.connect(self._update_voice_summary)
+        for form in (mf, af, tf):
+            form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        for combo in self.findChildren(QComboBox):
+            combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+            combo.setMinimumContentsLength(10)
         scroll.setWidget(page)
         root = QWidget()
         root.setObjectName("root")
@@ -303,7 +417,7 @@ class VoxBridgeWindow(QMainWindow):
         footer_layout.addWidget(self.stop_button)
         footer_layout.addStretch(1)
         self.state_label = QLabel("已停止")
-        self.state_label.setStyleSheet("font-weight: 600;")
+        self.state_label.setObjectName("state")
         footer_layout.addWidget(self.state_label)
         root_layout.addWidget(footer)
         self.setCentralWidget(root)
@@ -445,6 +559,13 @@ class VoxBridgeWindow(QMainWindow):
         self.index_slider.setValue(round(s.index_rate * 100))
         self._select_data(self.block_combo, s.block_ms)
         self._update_route_help()
+        self._update_voice_summary()
+
+    def _update_voice_summary(self, *_: Any) -> None:
+        name = Path(self.model_edit.text().strip()).stem
+        visible = name if len(name) <= 24 else name[:23] + "…"
+        self.voice_button.setText(f"聲線  /  {visible}  →" if name else "選擇你的聲線  →")
+        self.voice_button.setToolTip(self.model_edit.text() or "前往模型與引擎，選擇 RVC 模型")
 
     def _connect_live_controls(self) -> None:
         self.monitor_checkbox.toggled.connect(self._update_monitor)
@@ -481,8 +602,8 @@ class VoxBridgeWindow(QMainWindow):
     def _notice(self, message: str, *, error: bool = False) -> None:
         self.notice_label.setText(message)
         self.notice_label.setStyleSheet(
-            "background: #573039; color: #ffe4e7; border-radius: 6px; padding: 9px;"
-            if error else "background: #254335; color: #e0f8eb; border-radius: 6px; padding: 9px;"
+            "background: #fff0ed; color: #a24035; border: 1px solid #f2d3cd; border-radius: 8px; padding: 11px;"
+            if error else "background: #e8f4ef; color: #256854; border: 1px solid #cce7dc; border-radius: 8px; padding: 11px;"
         )
         self.notice_label.show()
 
@@ -644,8 +765,6 @@ class VoxBridgeWindow(QMainWindow):
             self.monitor_checkbox.setChecked(False)
             self.monitor_checkbox.blockSignals(False)
             self._applied_monitor_enabled = False
-        labels = {"stopped": "已停止", "loading": "正在載入模型…", "running": "變聲中", "stopping": "正在停止…", "error": "發生錯誤"}
-        self.state_label.setText(labels.get(state, state))
         self.input_meter.setValue(self._meter_value(snapshot.get("input_rms", 0)))
         self.output_meter.setValue(self._meter_value(snapshot.get("output_rms", 0)))
         process = snapshot.get("process_ms", 0)
@@ -653,12 +772,11 @@ class VoxBridgeWindow(QMainWindow):
             process_text = f"{float(process):.0f}"
         except (TypeError, ValueError):
             process_text = "—"
+        self.process_value.setText(f"{process_text} ms" if state == "running" else "— ms")
         self.metrics_label.setText(
-            f"處理時間：{process_text} ms（僅引擎處理時間，非端到端延遲）  ·  "
-            f"輸入丟失：{snapshot.get('input_drops', 0)}  ·  "
-            f"輸出欠載：{snapshot.get('output_underruns', 0)}  ·  "
-            f"監聽欠載：{snapshot.get('monitor_underruns', 0)}  ·  "
-            f"處理超時：{snapshot.get('overruns', 0)}"
+            "引擎處理時間，非端到端延遲\n"
+            f"輸入丟失  {snapshot.get('input_drops', 0)}    輸出欠載  {snapshot.get('output_underruns', 0)}\n"
+            f"監聽欠載  {snapshot.get('monitor_underruns', 0)}    處理超時  {snapshot.get('overruns', 0)}"
         )
         self._maybe_finish_close()
 
@@ -670,6 +788,12 @@ class VoxBridgeWindow(QMainWindow):
             return 0
 
     def _refresh_controls(self) -> None:
+        labels = {"stopped": "●  已停止", "loading": "●  載入中", "running": "●  變聲中", "stopping": "●  停止中", "error": "●  發生錯誤"}
+        self.state_label.setText(labels.get(self._state, self._state))
+        if self.state_label.property("status") != self._state:
+            self.state_label.setProperty("status", self._state)
+            self.state_label.style().unpolish(self.state_label)
+            self.state_label.style().polish(self.state_label)
         locked = self._state in ("loading", "running", "stopping") or self._download_thread is not None
         for widget in (
             self.model_edit, self.model_browse, self.index_edit, self.index_browse,

@@ -1,6 +1,6 @@
 #define AppName "VoxBridge"
 #ifndef AppVersion
-#define AppVersion "0.2.0"
+#define AppVersion "0.2.1"
 #endif
 #define AppPublisher "VoxBridge contributors"
 #define AppExe "VoxBridge.exe"

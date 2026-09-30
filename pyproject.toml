@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "voxbridge-rvc"
-version = "0.2.0"
+version = "0.2.1"
 description = "A Windows desktop RVC voice changer with independent Discord output and monitoring"
 requires-python = ">=3.12,<3.13"
 dependencies = ["numpy>=1.26.4,<2", "PySide6>=6.8,<6.9", "sounddevice>=0.5,<0.6", "scipy>=1.13,<2", "soxr>=1.1,<2"]

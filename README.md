@@ -1,6 +1,12 @@
 # VoxBridge RVC
 
-Windows 11 桌面即時 RVC 變聲器，主要用於 Discord。這是 **0.2.0 Beta**：開發與自動檢查可在此環境完成；實際的 RTX 4070 SUPER、麥克風、虛擬音訊裝置和 Discord 效果仍需在使用者私人電腦驗收。
+Windows 11 桌面即時 RVC 變聲器，主要用於 Discord。這是 **0.2.1 Beta**：開發與自動檢查可在此環境完成；實際的 RTX 4070 SUPER、麥克風、虛擬音訊裝置和 Discord 效果仍需在使用者私人電腦驗收。
+
+0.2.1 採用明亮介面，將日常控制、模型與引擎、使用指南分頁呈現。已安裝 0.2.0 的使用者可優先使用相容的小型更新包。
+
+![VoxBridge 明亮介面](docs/images/voxbridge-light.png)
+
+畫面使用示範聲線與裝置，顯示停止狀態。
 
 介面可以載入既有的 RVC `.pth` 模型與可選的 `.index`、選擇麥克風與變聲輸出裝置、調整音高和處理區塊。獨立的「聽到自己的變聲」開關預設關閉；關閉只影響本機耳機監聽，變聲訊號仍輸出到 Discord 使用的虛擬音訊裝置。程式不會自動上傳語音、錄音或模型。
 
@@ -9,7 +15,7 @@ Windows 11 桌面即時 RVC 變聲器，主要用於 Discord。這是 **0.2.0 Be
 ## 在 Windows 11 安裝
 
 1. 在 GitHub 專案的 **Actions → Windows** 選擇成功的 `main`／版本建置，從 **Artifacts** 下載 **`VoxBridge-windows-installer`**。安裝包、portable 版和小型更新包是分開下載的 Artifact，下載安裝包不會連帶下載 portable 版。Artifact 會在流程指定期限後過期；目前不保證已產生可下載的安裝包。
-2. 解壓 Artifact，執行 `VoxBridge-0.2.0-beta-win64-setup.exe`。這是目前使用者安裝，不需系統管理員權限。若需要免安裝版，改下載 `VoxBridge-windows-portable`，解壓其中的 ZIP 後執行 `VoxBridge.exe`。
+2. 解壓 Artifact，執行 `VoxBridge-0.2.1-beta-win64-setup.exe`。這是目前使用者安裝，不需系統管理員權限。若需要免安裝版，改下載 `VoxBridge-windows-portable`，解壓其中的 ZIP 後執行 `VoxBridge.exe`。
 3. 準備你已訓練並**匯出的 RVC 推理模型** `.pth`（不是訓練 checkpoint）與可選的 `.index`。在介面中指定兩者路徑。你的模型保持在自己的電腦，不加入 Git 儲存庫或安裝包。
 4. 第一次使用時，按「下載必要的引擎檔案」，等待 HuBERT 與 RMVPE 基礎資產下載完成。這些大型權重不隨安裝包提供。
 5. 按照 [Discord 設定與驗收](docs/discord-setup.md) 接上虛擬音訊裝置，再按「開始變聲」。
