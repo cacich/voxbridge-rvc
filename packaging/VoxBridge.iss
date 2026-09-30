@@ -1,5 +1,7 @@
 #define AppName "VoxBridge"
-#define AppVersion "0.1.0"
+#ifndef AppVersion
+#define AppVersion "0.2.0"
+#endif
 #define AppPublisher "VoxBridge contributors"
 #define AppExe "VoxBridge.exe"
 
@@ -13,7 +15,7 @@ DefaultDirName={localappdata}\Programs\VoxBridge
 DefaultGroupName=VoxBridge
 PrivilegesRequired=lowest
 OutputDir=..\dist
-OutputBaseFilename=VoxBridge-0.1.0-beta-win64-setup
+OutputBaseFilename=VoxBridge-{#AppVersion}-beta-win64-setup
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible
@@ -22,6 +24,7 @@ UninstallDisplayIcon={app}\{#AppExe}
 DisableProgramGroupPage=yes
 SetupLogging=yes
 LicenseFile=..\LICENSE
+SetupIconFile=..\src\voxbridge\resources\voxbridge.ico
 
 [Files]
 Source: "..\dist\VoxBridge\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

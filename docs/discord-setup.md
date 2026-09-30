@@ -1,6 +1,8 @@
 # Windows 11 與 Discord 設定
 
-VoxBridge 需要一個虛擬音訊裝置，把程式播放的變聲結果轉成 Discord 可選的麥克風。可使用 [VB-Audio VB-CABLE](https://vb-audio.com/Cable/)；請照其官方安裝說明完成驅動安裝與必要的重開機。VoxBridge 安裝程式不會安裝虛擬音訊驅動。
+要把 VoxBridge 的變聲結果送入 Discord，需要一個虛擬音訊裝置。可使用 [VB-Audio VB-CABLE](https://vb-audio.com/Cable/)；請照其官方安裝說明完成驅動安裝與必要的重開機。VoxBridge 安裝程式不會安裝虛擬音訊驅動。
+
+如果只想先測試模型，輸出模式選「只在耳機測試變聲」，選擇麥克風和監聽耳機，勾選「聽到自己的變聲」再開始。此模式不需要 VB-CABLE，也不會送往 Discord；執行中仍可切換監聽靜音。
 
 | 位置 | 選擇 |
 | --- | --- |
@@ -18,4 +20,6 @@ VoxBridge 需要一個虛擬音訊裝置，把程式播放的變聲結果轉成 
 4. 按「開始變聲」，看麥克風與變聲輸出音量條是否有反應。先用 Discord 的麥克風測試，再進入通話。
 5. 若想在耳機聽到自己的變聲，勾選「聽到自己的變聲」並調整監聽音量。關閉時 Discord 仍應收到變聲輸出。
 
-若 Discord 收不到聲音，先核對 VoxBridge 輸出為 `CABLE Input`，Discord 輸入為 `CABLE Output`，再確認兩個程式沒有選到已拔除的裝置。若有爆音或斷續，先增加 VoxBridge 的處理區塊大小、關閉其他大量使用 GPU 的程式，並重新開始變聲。若仍異常，匯出診斷資料，按[驗收表](home-validation.md)回報。
+若 Discord 收不到聲音，先核對 VoxBridge 輸出為 `CABLE Input`，Discord 輸入為 `CABLE Output`，再確認兩個程式沒有選到已拔除的裝置。預設裝置清單優先顯示可用的 Windows WASAPI 裝置；若看不到耳機或播放裝置，先連上耳機，在 Windows 音效設定確認它已啟用且能播放測試聲音，停止變聲後按「重新整理裝置」。仍看不到時可勾選進階裝置清單。VoxBridge 會嘗試 48 kHz、裝置預設取樣率及 44.1 kHz；選擇可用的實體播放裝置作為監聽即可，只有要送進 Discord 才需要 VB-CABLE。
+
+若有爆音或斷續，先增加 VoxBridge 的處理區塊大小、關閉其他大量使用 GPU 的程式，並重新開始變聲。若仍異常，匯出診斷資料，按[驗收表](home-validation.md)回報。

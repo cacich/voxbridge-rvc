@@ -3,7 +3,7 @@
 from pathlib import Path
 from importlib.util import find_spec
 
-from PyInstaller.utils.hooks import collect_all, collect_data_files, copy_metadata
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules, copy_metadata
 
 
 root = Path.cwd()
@@ -11,23 +11,27 @@ hiddenimports = []
 datas = [(str(root / "LICENSE"), "."), (str(root / "THIRD_PARTY_NOTICES.md"), ".")]
 binaries = []
 
-# RVC loads these packages through configuration paths after the GUI has started.
-for package in ("torch", "torchaudio", "faiss", "librosa", "soundfile", "transformers"):
+# Torch, Qt, NumPy and Librosa use PyInstaller's maintained package hooks. Faiss
+# loads native SWIG modules dynamically; HuBERT is selected by Transformers'
+# lazy importer. Collect only those two dynamic portions.
+for package in ("torch", "faiss", "transformers"):
     if find_spec(package) is None:
         raise RuntimeError(f"Missing inference dependency: {package}")
-    package_datas, package_binaries, package_hidden = collect_all(package)
-    datas += package_datas
-    binaries += package_binaries
-    hiddenimports += package_hidden
+faiss_datas, faiss_binaries, faiss_hidden = collect_all("faiss")
+datas += faiss_datas
+binaries += faiss_binaries
+hiddenimports += faiss_hidden
+hiddenimports += collect_submodules("transformers.models.hubert")
 
 # Preserve runtime version metadata and the licenses shipped with each wheel.
 # Qt remains dynamically linked in the onedir distribution.
 for distribution in ("PySide6", "PySide6-Essentials", "PySide6-Addons", "shiboken6",
-                     "torch", "torchaudio", "faiss-cpu", "librosa", "soundfile",
-                     "transformers", "sounddevice", "scipy"):
-    datas += copy_metadata(distribution, recursive=True)
+                     "torch", "faiss-cpu", "librosa", "soundfile", "transformers",
+                     "sounddevice", "scipy", "numpy", "tokenizers", "safetensors",
+                     "huggingface-hub", "packaging"):
+    datas += copy_metadata(distribution)
 
-datas += collect_data_files("voxbridge", includes=["vendor/**/*"])
+datas += collect_data_files("voxbridge", includes=["vendor/**/*", "resources/**/*"])
 a = Analysis(
     [str(root / "packaging" / "entry.py")],
     pathex=[str(root / "src")],
@@ -37,7 +41,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["tkinter", "matplotlib", "IPython", "notebook", "pytest"],
+    excludes=["tkinter", "matplotlib", "IPython", "notebook", "pytest", "tensorflow", "jax", "flax", "torchvision"],
     noarchive=False,
 )
 pyz = PYZ(a.pure)
@@ -52,6 +56,7 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,
+    icon=str(root / "src" / "voxbridge" / "resources" / "voxbridge.ico"),
 )
 coll = COLLECT(
     exe,

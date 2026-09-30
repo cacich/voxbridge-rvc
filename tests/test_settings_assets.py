@@ -58,3 +58,19 @@ def test_diagnostics_json_redacts_home_and_excludes_model_contents(tmp_path):
     data = json.loads(text)
     assert data["settings"]["model_path"] == "voice.pth"
     assert str(Path.home()) not in data["audio"]["error"]
+
+
+def test_diagnostics_redacts_last_session_paths_without_mutating_snapshot(tmp_path):
+    snapshot = {"session_settings": {
+        "model_path": r"D:\private\voices\voice.pth",
+        "index_path": r"D:\private\voices\voice.index",
+        "assets_dir": r"D:\private\assets",
+        "sample_rate": 48000,
+    }}
+    destination = export_diagnostics(tmp_path / "report.json", AppSettings(), snapshot, [])
+    data = json.loads(destination.read_text(encoding="utf-8"))
+    assert data["audio"]["session_settings"] == {
+        "model_path": "voice.pth", "index_path": "voice.index",
+        "assets_dir": "assets", "sample_rate": 48000,
+    }
+    assert snapshot["session_settings"]["model_path"].startswith("D:")

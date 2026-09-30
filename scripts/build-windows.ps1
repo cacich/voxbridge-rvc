@@ -15,6 +15,8 @@ if (-not [Environment]::Is64BitOperatingSystem) { throw '64-bit Windows required
 
 Push-Location $projectRoot
 try {
+    $version = (& py -3.12 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+    if ($LASTEXITCODE -ne 0 -or -not $version) { throw 'Unable to read project version.' }
     if (-not (Test-Path $python)) {
         & py -3.12 -m venv $venvRoot
         if ($LASTEXITCODE -ne 0) { throw 'Python 3.12 is required. Install it from python.org.' }
@@ -41,8 +43,15 @@ try {
     $engineReport = Join-Path $outputRoot 'engine-check.json'
     $engineCheck = Start-Process -FilePath $appExe -ArgumentList @('--check-engine', '--check-engine-report', ('"' + $engineReport + '"')) -PassThru -Wait -WindowStyle Hidden
     if ($engineCheck.ExitCode -ne 0) { throw "Bundled inference dependency check failed (exit $($engineCheck.ExitCode))." }
+    if (-not (Test-Path -LiteralPath $engineReport)) { throw 'Engine check report was not created.' }
+    $engineResult = Get-Content -LiteralPath $engineReport -Raw -Encoding utf8 | ConvertFrom-Json
+    if (-not $engineResult.ok) { throw "Bundled inference dependency check failed: $($engineResult.error)" }
 
-    $zipPath = Join-Path $outputRoot 'VoxBridge-0.1.0-beta-win64-portable.zip'
+    $updatePath = Join-Path $outputRoot "VoxBridge-$version-beta-win64-app-update.zip"
+    & $python 'scripts\package-update.py' (Join-Path $outputRoot 'VoxBridge') $updatePath
+    if ($LASTEXITCODE -ne 0) { throw 'Application update packaging failed.' }
+
+    $zipPath = Join-Path $outputRoot "VoxBridge-$version-beta-win64-portable.zip"
     & $python 'scripts\make-portable-zip.py' (Join-Path $outputRoot 'VoxBridge') $zipPath
     if ($LASTEXITCODE -ne 0) { throw 'Portable ZIP creation failed.' }
 
@@ -56,7 +65,7 @@ try {
             if ($command) { $iscc = $command.Source }
         }
         if (-not $iscc) { throw 'Inno Setup 6 ISCC.exe is required. Run with -SkipInstaller for portable ZIP only.' }
-        & $iscc 'packaging\VoxBridge.iss'
+        & $iscc "/DAppVersion=$version" 'packaging\VoxBridge.iss'
         if ($LASTEXITCODE -ne 0) { throw 'Inno Setup failed.' }
     }
 
@@ -64,7 +73,7 @@ try {
     $revision = (& git rev-parse HEAD 2>$null)
     if ($LASTEXITCODE -ne 0) { $revision = 'unavailable' }
     @(
-        'VoxBridge 0.1.0 beta Windows x64 build'
+        "VoxBridge $version beta Windows x64 build"
         "Git revision: $revision"
         "Built at UTC: $([DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))"
         "Python: $(& $python --version)"

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QObject, QThread, QTimer, Qt, Signal, Slot
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -66,6 +67,9 @@ class VoxBridgeWindow(QMainWindow):
     ) -> None:
         super().__init__()
         self.setWindowTitle(f"VoxBridge {__version__} Beta — RVC 即時變聲")
+        icon_path = Path(__file__).resolve().parent / "resources" / "voxbridge.ico"
+        if icon_path.is_file():
+            self.setWindowIcon(QIcon(str(icon_path)))
         self.resize(900, 820)
         self.setMinimumSize(740, 650)
         self._smoke_test = smoke_test
@@ -73,6 +77,7 @@ class VoxBridgeWindow(QMainWindow):
         self._download_thread: QThread | None = None
         self._download_worker: DownloadWorker | None = None
         self._state = "stopped"
+        self._last_monitor_error = ""
         self._service = service
         self._settings_notice = ""
         try:
@@ -89,7 +94,7 @@ class VoxBridgeWindow(QMainWindow):
             try:
                 from voxbridge.audio import list_devices
 
-                self._devices = list_devices()
+                self._devices = list_devices(show_advanced=False)
             except Exception as exc:
                 self._devices = []
                 self._settings_notice = f"無法列出音訊裝置：{exc}"
@@ -150,7 +155,7 @@ class VoxBridgeWindow(QMainWindow):
 
         title = QLabel("VoxBridge")
         title.setStyleSheet("font-size: 28px; font-weight: 700; color: #ffffff;")
-        subtitle = QLabel("RVC 即時變聲  ·  Windows 11  ·  0.1.0 Beta")
+        subtitle = QLabel(f"RVC 即時變聲  ·  Windows 11  ·  {__version__} Beta")
         subtitle.setObjectName("muted")
         layout.addWidget(title)
         layout.addWidget(subtitle)
@@ -185,15 +190,29 @@ class VoxBridgeWindow(QMainWindow):
 
         audio = QGroupBox("2  音訊路由")
         af = QFormLayout(audio)
+        self.output_mode_combo = QComboBox()
+        self.output_mode_combo.addItem("Discord 虛擬麥克風", "discord")
+        self.output_mode_combo.addItem("只在耳機測試變聲", "monitor_only")
+        af.addRow("輸出模式", self.output_mode_combo)
         self.input_combo = QComboBox()
         self.output_combo = QComboBox()
         self.monitor_combo = QComboBox()
-        self._fill_devices(self.input_combo, "inputs", "選擇麥克風")
-        self._fill_devices(self.output_combo, "outputs", "選擇變聲輸出，例如 CABLE Input")
-        self._fill_devices(self.monitor_combo, "outputs", "選擇耳機或喇叭")
+        self._rebuild_device_combos(("", "", ""))
         af.addRow("麥克風", self.input_combo)
         af.addRow("變聲輸出", self.output_combo)
         af.addRow("監聽裝置", self.monitor_combo)
+        self.advanced_devices_checkbox = QCheckBox("顯示其他音訊介面（進階）")
+        self.advanced_devices_checkbox.setToolTip("進階清單可能包含未連接的舊裝置或同一裝置的其他介面。")
+        self.refresh_devices_button = QPushButton("重新整理裝置")
+        device_actions = QHBoxLayout()
+        device_actions.addWidget(self.refresh_devices_button)
+        device_actions.addWidget(self.advanced_devices_checkbox)
+        device_actions.addStretch(1)
+        af.addRow("", self._wrap(device_actions))
+        self.device_help = QLabel("")
+        self.device_help.setObjectName("muted")
+        self.device_help.setWordWrap(True)
+        af.addRow("", self.device_help)
         self.monitor_checkbox = QCheckBox("聽到自己的變聲（預設關閉）")
         self.monitor_checkbox.setToolTip("只控制你聽到的聲音；Discord 的變聲輸出會繼續。建議使用耳機避免回授。")
         af.addRow("本機監聽", self.monitor_checkbox)
@@ -201,6 +220,10 @@ class VoxBridgeWindow(QMainWindow):
         af.addRow("監聽音量", self._slider_row(self.monitor_slider, self.monitor_value))
         self.output_slider, self.output_value = self._gain_controls()
         af.addRow("變聲輸出音量", self._slider_row(self.output_slider, self.output_value))
+        self.route_help = QLabel("")
+        self.route_help.setObjectName("muted")
+        self.route_help.setWordWrap(True)
+        af.addRow("", self.route_help)
         layout.addWidget(audio)
 
         tuning = QGroupBox("3  轉換設定")
@@ -293,6 +316,11 @@ class VoxBridgeWindow(QMainWindow):
         self.stop_button.clicked.connect(self._stop)
         self.diagnostic_button.clicked.connect(self._export_diagnostics)
         self.index_slider.valueChanged.connect(lambda n: self.index_value.setText(f"{n}%"))
+        self.output_mode_combo.currentIndexChanged.connect(self._update_route_help)
+        self.output_combo.currentIndexChanged.connect(self._update_route_help)
+        self.monitor_combo.currentIndexChanged.connect(self._update_route_help)
+        self.refresh_devices_button.clicked.connect(self._refresh_devices)
+        self.advanced_devices_checkbox.toggled.connect(self._refresh_devices)
 
     @staticmethod
     def _wrap(layout: QHBoxLayout) -> QWidget:
@@ -326,6 +354,7 @@ class VoxBridgeWindow(QMainWindow):
         return slider, label
 
     def _fill_devices(self, combo: QComboBox, capability: str, placeholder: str) -> None:
+        combo.clear()
         combo.addItem(placeholder, "")
         for device in self._devices:
             if getattr(device, capability, 0) > 0:
@@ -334,7 +363,69 @@ class VoxBridgeWindow(QMainWindow):
     @staticmethod
     def _select_data(combo: QComboBox, value: Any) -> None:
         index = combo.findData(value)
+        if value and index < 0:
+            combo.setItemText(0, "裝置目前不可用，請重新選擇")
+            combo.setItemData(0, "")
+            combo.setToolTip(f"先前選擇的裝置目前不可用：{value}")
+        else:
+            combo.setToolTip("")
         combo.setCurrentIndex(index if index >= 0 else 0)
+
+    def _rebuild_device_combos(self, keys: tuple[str, str, str]) -> None:
+        for combo, capability, placeholder, key in (
+            (self.input_combo, "inputs", "選擇麥克風", keys[0]),
+            (self.output_combo, "outputs", "選擇變聲輸出，例如 CABLE Input", keys[1]),
+            (self.monitor_combo, "outputs", "選擇耳機或喇叭", keys[2]),
+        ):
+            combo.blockSignals(True)
+            self._fill_devices(combo, capability, placeholder)
+            self._select_data(combo, key)
+            combo.blockSignals(False)
+
+    def _refresh_devices(self, *_: Any) -> None:
+        if self._state not in ("stopped", "error") or self._download_thread is not None:
+            return
+        if self._state == "error" and self._service is not None:
+            wait = getattr(self._service, "wait", None)
+            if callable(wait) and not wait(0):
+                self._notice("音訊工作仍在結束，請稍後重新整理。", error=True)
+                return
+        keys = (
+            self.input_combo.currentData() or "",
+            self.output_combo.currentData() or "",
+            self.monitor_combo.currentData() or "",
+        )
+        try:
+            from voxbridge.audio import refresh_devices
+
+            self._devices = refresh_devices(show_advanced=self.advanced_devices_checkbox.isChecked())
+        except Exception as exc:
+            self._notice(f"無法重新整理音訊裝置：{exc}", error=True)
+            return
+        self._rebuild_device_combos(keys)
+        self._update_route_help()
+        self._notice("音訊裝置清單已更新。" if self._devices else "目前找不到可用音訊裝置。請檢查 Windows 音效設定。")
+
+    def _update_route_help(self, *_: Any) -> None:
+        mode = self.output_mode_combo.currentData()
+        output = self.output_combo.currentData() or ""
+        monitor = self.monitor_combo.currentData() or ""
+        playback_count = sum(getattr(device, "outputs", 0) > 0 for device in self._devices)
+        if playback_count == 0:
+            self.device_help.setText(
+                "目前沒有可用的播放裝置。請連接耳機或喇叭，在 Windows 音效設定確認裝置已啟用，然後按「重新整理裝置」。"
+            )
+        elif self.advanced_devices_checkbox.isChecked():
+            self.device_help.setText("進階清單可能包含未連接的舊裝置與同一裝置的其他音訊介面；建議優先選擇 Windows WASAPI。")
+        else:
+            self.device_help.setText("預設僅顯示目前可用的 Windows WASAPI 裝置。若找不到裝置，檢查連線後重新整理。")
+        if mode == "monitor_only":
+            self.route_help.setText("耳機測試模式不需要 CABLE。請選擇耳機或喇叭並開啟本機監聽；聲音不會送到 Discord。")
+        elif output and output == monitor:
+            self.route_help.setText("變聲輸出與監聽選了同一裝置。聲音只會播放一次；此時使用「變聲輸出音量」調整，關閉監聽不會靜音主要輸出。")
+        else:
+            self.route_help.setText("Discord 模式需要虛擬音訊線：此處選 CABLE Input，Discord 輸入選 CABLE Output。")
+        self._refresh_controls()
 
     def _populate_settings(self) -> None:
         s = self.settings
@@ -342,6 +433,7 @@ class VoxBridgeWindow(QMainWindow):
         self.model_edit.setText(s.model_path)
         self.index_edit.setText(s.index_path)
         self.assets_edit.setText(s.assets_dir)
+        self._select_data(self.output_mode_combo, s.output_mode)
         self._select_data(self.input_combo, s.input_device)
         self._select_data(self.output_combo, s.output_device)
         self._select_data(self.monitor_combo, s.monitor_device)
@@ -352,6 +444,7 @@ class VoxBridgeWindow(QMainWindow):
         self.pitch_spin.setValue(s.pitch)
         self.index_slider.setValue(round(s.index_rate * 100))
         self._select_data(self.block_combo, s.block_ms)
+        self._update_route_help()
 
     def _connect_live_controls(self) -> None:
         self.monitor_checkbox.toggled.connect(self._update_monitor)
@@ -364,7 +457,8 @@ class VoxBridgeWindow(QMainWindow):
             index_path=self.index_edit.text().strip(),
             assets_dir=self.assets_edit.text().strip(),
             input_device=self.input_combo.currentData() or "",
-            output_device=self.output_combo.currentData() or "",
+            output_device=(self.output_combo.currentData() or "") if self.output_mode_combo.currentData() == "discord" else "",
+            output_mode=self.output_mode_combo.currentData(),
             monitor_device=self.monitor_combo.currentData() or "",
             monitor_enabled=self.monitor_checkbox.isChecked(),
             monitor_gain=self.monitor_slider.value() / 100,
@@ -452,13 +546,16 @@ class VoxBridgeWindow(QMainWindow):
         if settings.index_path and not Path(settings.index_path).is_file():
             self._notice("所選 .index 索引檔不存在。", error=True)
             return
-        if not settings.input_device or not settings.output_device:
-            self._notice("請選擇麥克風與變聲輸出裝置。", error=True)
+        if not settings.input_device:
+            self._notice("請先選擇可用的麥克風；若清單為空，請檢查 Windows 音效設定後重新整理。", error=True)
             return
-        if settings.monitor_device and settings.monitor_device == settings.output_device:
-            self._notice("監聽與變聲輸出需選擇不同裝置，避免重複播放。", error=True)
+        if settings.output_mode == "discord" and not settings.output_device:
+            self._notice("Discord 模式需選擇變聲輸出，例如 CABLE Input；也可以改用「只在耳機測試變聲」。", error=True)
             return
-        if settings.monitor_enabled and not settings.monitor_device:
+        if settings.output_mode == "monitor_only" and not settings.monitor_enabled:
+            self._notice("耳機測試模式需開啟本機監聽。", error=True)
+            return
+        if (settings.monitor_enabled or settings.output_mode == "monitor_only") and not settings.monitor_device:
             self._notice("開啟監聽前，請選擇耳機或喇叭。", error=True)
             return
         if settings.index_rate > 0 and not settings.index_path:
@@ -498,7 +595,7 @@ class VoxBridgeWindow(QMainWindow):
             self.monitor_checkbox.blockSignals(True)
             self.monitor_checkbox.setChecked(False)
             self.monitor_checkbox.blockSignals(False)
-            self._notice("請先停止變聲並選擇監聽裝置，再開啟監聽。", error=True)
+            self._notice("請先選擇監聽裝置，再開啟監聽。執行中需先停止才能更換裝置。", error=True)
             return
         if self._service is not None and self._state in ("loading", "running"):
             try:
@@ -533,8 +630,20 @@ class VoxBridgeWindow(QMainWindow):
             if state == "error":
                 self._notice(f"變聲引擎發生錯誤：{snapshot.get('error') or '未知錯誤'}", error=True)
             elif state == "running":
-                self._notice("變聲正在輸出。請在 Discord 選擇 CABLE Output 作為輸入。")
+                if self.output_mode_combo.currentData() == "monitor_only":
+                    self._notice("耳機測試正在播放變聲；此模式不會送到 Discord。")
+                else:
+                    self._notice("變聲正在輸出。請在 Discord 選擇 CABLE Output 作為輸入。")
             self._refresh_controls()
+        monitor_error = snapshot.get("monitor_error") or ""
+        if monitor_error and monitor_error != self._last_monitor_error:
+            self._notice(f"監聽裝置發生錯誤，主要輸出仍繼續：{monitor_error}", error=True)
+        self._last_monitor_error = monitor_error
+        if monitor_error and snapshot.get("monitor_enabled") is False and self.monitor_checkbox.isChecked():
+            self.monitor_checkbox.blockSignals(True)
+            self.monitor_checkbox.setChecked(False)
+            self.monitor_checkbox.blockSignals(False)
+            self._applied_monitor_enabled = False
         labels = {"stopped": "已停止", "loading": "正在載入模型…", "running": "變聲中", "stopping": "正在停止…", "error": "發生錯誤"}
         self.state_label.setText(labels.get(state, state))
         self.input_meter.setValue(self._meter_value(snapshot.get("input_rms", 0)))
@@ -564,17 +673,22 @@ class VoxBridgeWindow(QMainWindow):
         locked = self._state in ("loading", "running", "stopping") or self._download_thread is not None
         for widget in (
             self.model_edit, self.model_browse, self.index_edit, self.index_browse,
-            self.assets_edit, self.assets_browse, self.input_combo, self.output_combo,
+            self.assets_edit, self.assets_browse, self.input_combo, self.output_mode_combo,
             self.monitor_combo, self.compute_combo, self.pitch_spin, self.index_slider,
             self.block_combo,
         ):
             widget.setEnabled(not locked)
+        mode = self.output_mode_combo.currentData()
+        shared_output = mode == "discord" and bool(self.output_combo.currentData()) and self.output_combo.currentData() == self.monitor_combo.currentData()
+        self.output_combo.setEnabled(not locked and mode == "discord")
+        self.refresh_devices_button.setEnabled(not locked and self._state in ("stopped", "error"))
+        self.advanced_devices_checkbox.setEnabled(not locked and self._state in ("stopped", "error"))
         self.download_button.setEnabled(not locked)
         self.start_button.setEnabled(not locked and self._service is not None)
         self.stop_button.setEnabled(self._state in ("loading", "running"))
         self.monitor_checkbox.setEnabled(self._state != "stopping")
-        self.monitor_slider.setEnabled(self._state != "stopping")
-        self.output_slider.setEnabled(self._state != "stopping")
+        self.monitor_slider.setEnabled(self._state != "stopping" and not shared_output)
+        self.output_slider.setEnabled(self._state != "stopping" and mode == "discord")
 
     def _export_diagnostics(self) -> None:
         filename, _ = QFileDialog.getSaveFileName(
@@ -618,9 +732,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.check_engine:
         error = ""
         try:
-            for name in ("torch", "faiss", "librosa", "scipy", "voxbridge.vendor.module.models", "voxbridge.vendor.rmvpe"):
+            for name in ("torch", "faiss", "librosa", "scipy", "soxr", "voxbridge.vendor.module.models", "voxbridge.vendor.rmvpe"):
                 importlib.import_module(name)
             from transformers import HubertModel  # noqa: F401
+            import numpy as np
+            import soxr
+
+            resampler = soxr.ResampleStream(44100, 48000, 1, dtype="float32")
+            converted = resampler.resample_chunk(np.zeros(4096, dtype=np.float32), last=True)
+            if converted.size == 0 or not np.all(np.isfinite(converted)):
+                raise RuntimeError("soxr 取樣率轉換自檢沒有產生有效音訊")
         except Exception as exc:
             error = str(exc)
         if args.check_engine_report:
@@ -635,6 +756,13 @@ def main(argv: list[str] | None = None) -> int:
         if output is not None:
             print(f"推論模組檢查失敗：{error}" if error else "推論模組檢查通過", file=output)
         return 1 if error else 0
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("cacich.VoxBridge")
+        except (OSError, AttributeError):
+            pass
     app = QApplication.instance() or QApplication(sys.argv[:1])
     try:
         window = VoxBridgeWindow(smoke_test=args.smoke_test)

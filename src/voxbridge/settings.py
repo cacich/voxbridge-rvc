@@ -18,6 +18,7 @@ class AppSettings:
     assets_dir: str = ""
     input_device: str = ""
     output_device: str = ""
+    output_mode: str = "discord"
     monitor_device: str = ""
     monitor_enabled: bool = False
     monitor_gain: float = 0.7
@@ -29,6 +30,8 @@ class AppSettings:
     sample_rate: int = 48000
 
     def validate(self) -> None:
+        if self.output_mode not in ("discord", "monitor_only"):
+            raise ValueError("輸出模式必須是 Discord 或只在耳機測試")
         if self.device not in ("cuda", "cpu"):
             raise ValueError("運算裝置必須是 cuda 或 cpu")
         if self.block_ms not in (100, 150, 200, 250, 300, 400):
